@@ -1,140 +1,240 @@
-from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
+from PIL import Image, ImageDraw, ImageFont
 
-BASE_DIR = Path(__file__).resolve().parent
-ASSETS_DIR = BASE_DIR / "assets"
-ASSETS_DIR.mkdir(exist_ok=True)
 
-output_path = ASSETS_DIR / "workflow.png"
+PROJECT_DIR = Path(__file__).resolve().parent.parent
+OUTPUT_PATH = PROJECT_DIR / "assets" / "workflow.png"
 
-W, H = 1800, 1050
-img = Image.new("RGB", (W, H), "#F7F3EA")
+W, H = 1900, 1250
+
+COLORS = {
+    "bg": "#F7F3EA",
+    "navy": "#1E2A32",
+    "text": "#3D4A53",
+    "muted": "#68747D",
+    "line": "#8B6F47",
+    "border": "#D3C4A5",
+    "shadow": "#E5DCCB",
+    "cream": "#FFFDF7",
+    "sand": "#EFE3CC",
+    "green": "#E6EFEA",
+    "blue": "#E8EEF3",
+    "rose": "#F3E4DA",
+    "lavender": "#ECE8F3",
+    "footer": "#EFE4D0",
+}
+
+
+def font(size, bold=False):
+    paths = [
+        "/System/Library/Fonts/Supplemental/Arial Bold.ttf" if bold else "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "/System/Library/Fonts/Helvetica.ttc",
+    ]
+    for path in paths:
+        try:
+            return ImageFont.truetype(path, size)
+        except Exception:
+            continue
+    return ImageFont.load_default()
+
+
+TITLE_FONT = font(68, bold=True)
+SUBTITLE_FONT = font(31)
+STEP_FONT = font(22, bold=True)
+BOX_TITLE_FONT = font(32, bold=True)
+BOX_BODY_FONT = font(24)
+SECTION_FONT = font(28, bold=True)
+FOOTER_FONT = font(24)
+
+
+img = Image.new("RGB", (W, H), COLORS["bg"])
 draw = ImageDraw.Draw(img)
 
-try:
-    title_font = ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial Bold.ttf", 64)
-    subtitle_font = ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial.ttf", 32)
-    box_title_font = ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial Bold.ttf", 34)
-    box_text_font = ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial.ttf", 25)
-    small_font = ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial.ttf", 22)
-except:
-    title_font = ImageFont.load_default()
-    subtitle_font = ImageFont.load_default()
-    box_title_font = ImageFont.load_default()
-    box_text_font = ImageFont.load_default()
-    small_font = ImageFont.load_default()
 
-# Colors
-navy = "#1D2A35"
-blue = "#4C7A89"
-teal = "#6FA89A"
-sand = "#E6D5B8"
-cream = "#FFFDF7"
-brown = "#9A6B4F"
-gray = "#5C6670"
-line = "#B8A88A"
+def text_width(text, used_font):
+    box = draw.textbbox((0, 0), text, font=used_font)
+    return box[2] - box[0]
 
-# Header
-draw.text((90, 70), "HCI Paper Reading Assistant", fill=navy, font=title_font)
-draw.text(
-    (95, 150),
-    "An API-based workflow for transforming HCI papers into structured research notes",
-    fill=gray,
-    font=subtitle_font
-)
 
-# Helper functions
-def rounded_box(x, y, w, h, title, body, fill, outline="#D8C8A8"):
-    draw.rounded_rectangle((x, y, x + w, y + h), radius=28, fill=fill, outline=outline, width=3)
-    draw.text((x + 34, y + 28), title, fill=navy, font=box_title_font)
+def center_text(x, y, w, text, used_font, fill):
+    tw = text_width(text, used_font)
+    draw.text((x + (w - tw) / 2, y), text, font=used_font, fill=fill)
 
-    body_lines = body.split("\n")
-    yy = y + 82
-    for line_text in body_lines:
-        draw.text((x + 34, yy), line_text, fill=gray, font=box_text_font)
+
+def draw_module(x, y, w, h, step, title, lines, fill):
+    # shadow
+    draw.rounded_rectangle(
+        (x + 8, y + 10, x + w + 8, y + h + 10),
+        radius=32,
+        fill=COLORS["shadow"],
+    )
+
+    # box
+    draw.rounded_rectangle(
+        (x, y, x + w, y + h),
+        radius=32,
+        fill=fill,
+        outline=COLORS["border"],
+        width=3,
+    )
+
+    # step pill
+    pill_w, pill_h = 74, 34
+    draw.rounded_rectangle(
+        (x + 30, y + 26, x + 30 + pill_w, y + 26 + pill_h),
+        radius=17,
+        fill=COLORS["navy"],
+    )
+    center_text(x + 30, y + 31, pill_w, step, STEP_FONT, "#FFFFFF")
+
+    # title
+    draw.text((x + 30, y + 82), title, font=BOX_TITLE_FONT, fill=COLORS["navy"])
+
+    # body lines
+    yy = y + 136
+    for line in lines:
+        draw.text((x + 34, yy), "• " + line, font=BOX_BODY_FONT, fill=COLORS["muted"])
         yy += 36
 
-def arrow(x1, y1, x2, y2):
-    draw.line((x1, y1, x2, y2), fill=brown, width=5)
-    # arrow head
-    if x2 > x1:
-        draw.polygon([(x2, y2), (x2 - 18, y2 - 11), (x2 - 18, y2 + 11)], fill=brown)
-    elif y2 > y1:
-        draw.polygon([(x2, y2), (x2 - 11, y2 - 18), (x2 + 11, y2 - 18)], fill=brown)
 
-# Layout
-box_w = 420
-box_h = 180
-gap_x = 110
+def arrow_right(x1, y1, x2, y2):
+    draw.line((x1, y1, x2, y2), fill=COLORS["line"], width=6)
+    draw.polygon([(x2, y2), (x2 - 22, y2 - 14), (x2 - 22, y2 + 14)], fill=COLORS["line"])
 
-x1, y1 = 110, 300
-x2, y2 = x1 + box_w + gap_x, 300
-x3, y3 = x2 + box_w + gap_x, 300
 
-x4, y4 = 110, 650
-x5, y5 = x4 + box_w + gap_x, 650
-x6, y6 = x5 + box_w + gap_x, 650
+def arrow_left(x1, y1, x2, y2):
+    draw.line((x1, y1, x2, y2), fill=COLORS["line"], width=6)
+    draw.polygon([(x2, y2), (x2 + 22, y2 - 14), (x2 + 22, y2 + 14)], fill=COLORS["line"])
 
-rounded_box(
-    x1, y1, box_w, box_h,
-    "1. PDF Papers",
-    "Input academic papers\nfrom HCI / HAI research",
-    cream
+
+def arrow_down(x, y1, y2):
+    draw.line((x, y1, x, y2), fill=COLORS["line"], width=6)
+    draw.polygon([(x, y2), (x - 14, y2 - 22), (x + 14, y2 - 22)], fill=COLORS["line"])
+
+
+def draw_footer_box(x, y, w, h, title, body):
+    draw.rounded_rectangle(
+        (x, y, x + w, y + h),
+        radius=26,
+        fill=COLORS["footer"],
+        outline=COLORS["border"],
+        width=2,
+    )
+    draw.text((x + 32, y + 24), title, font=SECTION_FONT, fill=COLORS["navy"])
+    draw.text((x + 32, y + 72), body, font=FOOTER_FONT, fill=COLORS["text"])
+
+
+# Header
+draw.text((100, 70), "HCI Paper Reading Assistant", font=TITLE_FONT, fill=COLORS["navy"])
+draw.text(
+    (105, 152),
+    "A structured AI workflow for transforming HCI papers into reusable research notes",
+    font=SUBTITLE_FONT,
+    fill=COLORS["muted"],
 )
 
-rounded_box(
-    x2, y2, box_w, box_h,
-    "2. Text Extraction",
-    "Use PyMuPDF to extract\npaper text from PDFs",
-    "#F3E9D6"
-)
+# Main workflow layout
+box_w = 470
+box_h = 245
 
-rounded_box(
-    x3, y3, box_w, box_h,
-    "3. HCI Prompt",
-    "Apply a reading framework:\nproblem, method, findings",
-    "#E8F0EC"
-)
+x_left = 100
+x_mid = 715
+x_right = 1330
 
-rounded_box(
-    x4, y4, box_w, box_h,
-    "4. API Analysis",
-    "Call OpenAI-compatible API\nfor structured interpretation",
-    "#E9EEF2"
-)
+y_top = 275
+y_bottom = 610
 
-rounded_box(
-    x5, y5, box_w, box_h,
-    "5. Reading Report",
-    "Generate Markdown notes\nfor human reading",
-    "#F4E6DC"
-)
+modules = [
+    (
+        x_left,
+        y_top,
+        "01",
+        "Input Layer",
+        ["HCI / HAI paper PDFs", "Multiple papers supported", "Local papers/ folder"],
+        COLORS["cream"],
+    ),
+    (
+        x_mid,
+        y_top,
+        "02",
+        "Text Processing",
+        ["Extract text with PyMuPDF", "Preserve page structure", "Prepare text for analysis"],
+        COLORS["sand"],
+    ),
+    (
+        x_right,
+        y_top,
+        "03",
+        "HCI Reading Prompt",
+        ["Research problem", "Method and findings", "Contribution and limitation"],
+        COLORS["green"],
+    ),
+    (
+        x_right,
+        y_bottom,
+        "04",
+        "API Analysis",
+        ["OpenAI-compatible API", "Structured LLM analysis", "HCI-focused interpretation"],
+        COLORS["blue"],
+    ),
+    (
+        x_mid,
+        y_bottom,
+        "05",
+        "Output Layer",
+        ["Markdown reading report", "JSON structured notes", "Reusable research materials"],
+        COLORS["rose"],
+    ),
+    (
+        x_left,
+        y_bottom,
+        "06",
+        "Research Reuse",
+        ["Literature review support", "Paper discussion preparation", "Project idea generation"],
+        COLORS["lavender"],
+    ),
+]
 
-rounded_box(
-    x6, y6, box_w, box_h,
-    "6. Research Reuse",
-    "Support literature review,\npaper discussion, project ideas",
-    "#E6EFEA"
-)
+for x, y, step, title, lines, fill in modules:
+    draw_module(x, y, box_w, box_h, step, title, lines, fill)
 
 # Arrows
-arrow(x1 + box_w, y1 + box_h / 2, x2, y2 + box_h / 2)
-arrow(x2 + box_w, y2 + box_h / 2, x3, y3 + box_h / 2)
-arrow(x3 + box_w / 2, y3 + box_h, x3 + box_w / 2, y5)
-arrow(x3, y5 + box_h / 2, x5 + box_w, y5 + box_h / 2)
-arrow(x5 + box_w, y5 + box_h / 2, x6, y6 + box_h / 2)
+top_mid_y = y_top + box_h // 2
+bottom_mid_y = y_bottom + box_h // 2
 
-# Connection label
-draw.text((700, 555), "LLM-supported academic sensemaking", fill=brown, font=small_font)
+arrow_right(x_left + box_w + 28, top_mid_y, x_mid - 28, top_mid_y)
+arrow_right(x_mid + box_w + 28, top_mid_y, x_right - 28, top_mid_y)
 
-# Bottom note
-draw.rounded_rectangle((90, 925, 1710, 990), radius=22, fill="#EFE4D0", outline="#D8C8A8", width=2)
-draw.text(
-    (125, 945),
-    "Positioning: Human-AI Collaboration for Academic Sensemaking · HCI Research Training Tool · API-based AI Workflow",
-    fill=navy,
-    font=small_font
+arrow_down(x_right + box_w // 2, y_top + box_h + 30, y_bottom - 30)
+
+arrow_left(x_right - 28, bottom_mid_y, x_mid + box_w + 28, bottom_mid_y)
+arrow_left(x_mid - 28, bottom_mid_y, x_left + box_w + 28, bottom_mid_y)
+
+# Project components section
+component_x = 100
+component_y = 925
+component_w = 1700
+component_h = 135
+
+draw_footer_box(
+    component_x,
+    component_y,
+    component_w,
+    component_h,
+    "Project Components",
+    "main.py · prompts/ · papers/ · outputs/ · examples/ · assets/ · portfolio_case_study/ · README.md",
 )
 
-img.save(output_path)
-print(f"Workflow image saved to: {output_path}")
+# Positioning section
+position_y = 1085
+draw_footer_box(
+    component_x,
+    position_y,
+    component_w,
+    105,
+    "Portfolio Positioning",
+    "AI-assisted Research Workflow · Academic Sensemaking Tool · Human-AI Collaboration for HCI Research Training",
+)
+
+img.save(OUTPUT_PATH)
+print(f"Workflow image saved to: {OUTPUT_PATH}")
